@@ -16,10 +16,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Helper log lỗi DB
-function logDbError(context, err) {
-  console.error(`[DB ERROR] ${context}:`, err.message);
-}
 
 // ===== Route test =====
 app.get("/", (req, res) => {
@@ -38,6 +34,8 @@ app.post("/api/cloud-save/sync", async (req, res) => {
     });
   }
 
+   const normalizedEmail = normalizeEmail(email);
+  
   try {
     const query = `
       INSERT INTO cloud_saves (email, username, save_json, updated_at)
@@ -49,7 +47,7 @@ app.post("/api/cloud-save/sync", async (req, res) => {
       RETURNING id, updated_at;
     `;
 
-    const values = [email, username, saveJson];
+    const values = [normalizedEmail, username, saveJson];
     const result = await pool.query(query, values);
 
     const row = result.rows[0];
@@ -57,7 +55,7 @@ app.post("/api/cloud-save/sync", async (req, res) => {
     return res.json({
       success: true,
       id: row.id,
-      email,
+      email: normalizedEmail,
       username,
       updatedAt: row.updated_at,
     });
@@ -80,7 +78,7 @@ app.get("/api/cloud-save/fetch", async (req, res) => {
       message: "Missing email or username",
     });
   }
-
+  const normalizedEmail = normalizeEmail(email);
   try {
     const query = `
       SELECT email, username, save_json, updated_at
@@ -88,7 +86,7 @@ app.get("/api/cloud-save/fetch", async (req, res) => {
       WHERE email = $1 AND username = $2
       LIMIT 1;
     `;
-    const values = [email, username];
+    const values = [normalizedEmail, username];
     const result = await pool.query(query, values);
 
     if (result.rows.length === 0) {
@@ -125,7 +123,7 @@ app.get("/api/cloud-save/list-by-email", async (req, res) => {
       message: "Missing email",
     });
   }
-
+  const normalizedEmail = normalizeEmail(email);
   try {
     const query = `
       SELECT username, updated_at
@@ -134,7 +132,7 @@ app.get("/api/cloud-save/list-by-email", async (req, res) => {
       ORDER BY updated_at DESC;
     `;
 
-    const values = [email];
+    const values = [normalizedEmail];
     const result = await pool.query(query, values);
 
     const entries = result.rows.map((row) => ({
@@ -144,7 +142,7 @@ app.get("/api/cloud-save/list-by-email", async (req, res) => {
 
     return res.json({
       success: true,
-      email,
+      email: normalizedEmail,
       entries,
     });
   } catch (err) {
@@ -155,6 +153,17 @@ app.get("/api/cloud-save/list-by-email", async (req, res) => {
     });
   }
 });
+
+// ===== Helper functions =====
+function normalizeEmail(email) {
+  if (!email) return "";
+  return email.trim().toLowerCase();
+}
+// Helper log lỗi DB
+function logDbError(context, err) {
+  console.error(`[DB ERROR] ${context}:`, err.message);
+}
+
 
 // ===== Khởi động server =====
 app.listen(PORT, () => {
