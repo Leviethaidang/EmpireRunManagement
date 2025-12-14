@@ -150,6 +150,46 @@ app.get("/api/cloud-save/list-by-email", async (req, res) => {
     });
   }
 });
+// ====== POST /api/cloud-log/add ======
+app.post("/api/cloud-log/add", async (req, res) => {
+  const { email, username, deviceId, content } = req.body || {};
+
+  if (!email || !username || !deviceId || !content) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing email, username, deviceId or content",
+    });
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+
+  try {
+    const query = `
+      INSERT INTO cloud_logs (email, username, device_id, content)
+      VALUES ($1, $2, $3, $4);
+    `;
+
+    const values = [
+      normalizedEmail,
+      username,
+      deviceId,
+      content,
+    ];
+
+    await pool.query(query, values);
+
+    return res.json({
+      success: true,
+    });
+  } catch (err) {
+    logDbError("cloud-log/add", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while adding log",
+    });
+  }
+});
+
 //===phan danh cho trang admin quan ly=====
 // ====== ADMIN APIs ======
 
@@ -311,12 +351,12 @@ function normalizeEmail(email) {
 }
 // Helper log lỗi DB
 function logDbError(context, err) {
-  console.error(`[DB ERROR] ${context}:`, err.message);
+  console.error(`[DB ERROR] ${context}:`, err);
 }
 
 // ===== Khởi động server =====
 app.listen(PORT, () => {
-  console.log(`CloudSaveServer is running on port ${PORT}`);
+  console.log(`CloudSaveServer running at http://localhost:${PORT}`);
 });
 // ===== Route =====
 app.get("/status", (req, res) => {
@@ -326,4 +366,14 @@ app.get("/status", (req, res) => {
 // Trang admin HTML
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+//test ket noi db
+app.get("/db-status", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT NOW() AS now;");
+    res.json({ ok: true, now: r.rows[0].now });
+  } catch (err) {
+    logDbError("db-status", err);
+    res.status(500).json({ ok: false, error: String(err) });
+  }
 });

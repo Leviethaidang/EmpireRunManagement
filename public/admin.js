@@ -1,5 +1,5 @@
 // ===== Cấu hình mật mã admin =====
-const ADMIN_SECRET = "123"; // <-- Mật mã của trang admin
+const ADMIN_SECRET = "123";
 
 // ===== Overlay mật mã =====
 function setupAdminLock() {
