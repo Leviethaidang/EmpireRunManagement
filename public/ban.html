@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>EmpireRun Services</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/shared.css" />
+</head>
+<body>
+  <div id="header-slot"></div>
+
+  <div class="admin-root wide">
+    <h1>Ban Management</h1>
+
+    <div class="column">
+      <div class="player-toolbar">
+        <input id="ban-search" class="player-search" placeholder="Search by email / username / device ID" />
+      </div>
+
+      <div class="player-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>DeviceID</th>
+              <th>Warn</th>
+              <th>Ban</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="ban-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    fetch("/header.html")
+      .then(r => r.text())
+      .then(html => {
+        document.getElementById("header-slot").innerHTML = html;
+        const s = document.createElement("script");
+        s.src = "/header.js";
+        s.onload = () => window.__ERS_Header && window.__ERS_Header.init();
+        document.body.appendChild(s);
+      });
+  </script>
+
+  <script src="/ban.js"></script>
+</body>
+</html>

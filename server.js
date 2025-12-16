@@ -725,6 +725,202 @@ app.get("/api/admin/reports/detail", async (req, res) => {
   }
 });
 
+// ===== Admin Ban/Warn APIs =====
+
+// Search players by email/username/deviceId -> list (player + device + warn + ban)
+app.get("/api/admin/ban/search", async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit || "100", 10), 500));
+    const qStr = String(req.query.q || "").trim().toLowerCase();
+
+    const q = `
+      SELECT
+        ad.email,
+        ad.username,
+        ad.device_id,
+        COALESCE(aw.is_warned, FALSE) AS is_warned,
+        COALESCE(db.is_banned, FALSE) AS is_banned
+      FROM account_devices ad
+      LEFT JOIN account_warnings aw
+        ON aw.email = ad.email AND aw.username = ad.username
+      LEFT JOIN device_bans db
+        ON db.device_id = ad.device_id
+      WHERE
+        ($1 = '' OR
+          ad.email ILIKE '%' || $1 || '%' OR
+          ad.username ILIKE '%' || $1 || '%' OR
+          LOWER(ad.device_id) LIKE '%' || $1 || '%'
+        )
+      ORDER BY ad.email ASC, ad.username ASC, ad.device_id ASC
+      LIMIT $2;
+    `;
+
+    const r = await pool.query(q, [qStr, limit]);
+
+    const items = r.rows.map(x => ({
+      email: x.email,
+      username: x.username,
+      deviceId: x.device_id,
+      isWarned: !!x.is_warned,
+      isBanned: !!x.is_banned,
+    }));
+
+    return res.json({ success: true, items });
+  } catch (err) {
+    console.error("GET /api/admin/ban/search error:", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+// Warn a device -> set warn=true for ALL accounts that ever used this device
+app.post("/api/admin/ban/warn-device", async (req, res) => {
+  try {
+    const deviceId = String(req.body.deviceId || "").trim();
+    if (!deviceId) return res.status(400).json({ success: false, error: "missing_deviceId" });
+
+    const qAccounts = `
+      SELECT DISTINCT email, username
+      FROM account_devices
+      WHERE device_id = $1;
+    `;
+    const acc = await pool.query(qAccounts, [deviceId]);
+
+    if (acc.rows.length === 0) {
+      return res.json({ success: true, affectedAccounts: 0 });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      for (const row of acc.rows) {
+        await client.query(
+          `
+          INSERT INTO account_warnings (email, username, is_warned, updated_at)
+          VALUES ($1, $2, TRUE, NOW())
+          ON CONFLICT (email, username)
+          DO UPDATE SET is_warned = TRUE, updated_at = NOW();
+          `,
+          [row.email, row.username]
+        );
+      }
+
+      await client.query("COMMIT");
+      return res.json({ success: true, affectedAccounts: acc.rows.length });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("POST /api/admin/ban/warn-device error:", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+// Clear warning for a specific account (admin tool)
+app.post("/api/admin/ban/clear-warn", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const username = String(req.body.username || "").trim();
+    if (!email || !username) return res.status(400).json({ success: false, error: "missing_email_or_username" });
+
+    const q = `
+      INSERT INTO account_warnings (email, username, is_warned, updated_at)
+      VALUES ($1, $2, FALSE, NOW())
+      ON CONFLICT (email, username)
+      DO UPDATE SET is_warned = FALSE, updated_at = NOW();
+    `;
+    await pool.query(q, [email, username]);
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("POST /api/admin/ban/clear-warn error:", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+// Ban/unban a device
+app.post("/api/admin/ban/set-ban", async (req, res) => {
+  try {
+    const deviceId = String(req.body.deviceId || "").trim();
+    const isBanned = !!req.body.isBanned;
+
+    if (!deviceId) return res.status(400).json({ success: false, error: "missing_deviceId" });
+
+    const q = `
+      INSERT INTO device_bans (device_id, is_banned, updated_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (device_id)
+      DO UPDATE SET is_banned = $2, updated_at = NOW();
+    `;
+    await pool.query(q, [deviceId, isBanned]);
+
+    return res.json({ success: true, deviceId, isBanned });
+  } catch (err) {
+    console.error("POST /api/admin/ban/set-ban error:", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+
+// ===== Unity APIs =====
+
+// Check status on login: ban by deviceId, warn by account (email+username)
+app.get("/api/device/status", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.query.email);
+    const username = String(req.query.username || "").trim();
+    const deviceId = String(req.query.deviceId || "").trim();
+
+    if (!email || !username || !deviceId) {
+      return res.status(400).json({ success: false, error: "missing_email_username_deviceId" });
+    }
+
+    const banR = await pool.query(
+      `SELECT is_banned FROM device_bans WHERE device_id = $1 LIMIT 1;`,
+      [deviceId]
+    );
+    const isBanned = banR.rows.length ? !!banR.rows[0].is_banned : false;
+
+    const warnR = await pool.query(
+      `SELECT is_warned FROM account_warnings WHERE email = $1 AND username = $2 LIMIT 1;`,
+      [email, username]
+    );
+    const isWarned = warnR.rows.length ? !!warnR.rows[0].is_warned : false;
+
+    return res.json({ success: true, isBanned, isWarned });
+  } catch (err) {
+    console.error("GET /api/device/status error:", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+// Ack warning (Unity after showing warning panel): set warn=false for account
+app.post("/api/device/warn/ack", async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const username = String(req.body.username || "").trim();
+
+    if (!email || !username) {
+      return res.status(400).json({ success: false, error: "missing_email_or_username" });
+    }
+
+    const q = `
+      INSERT INTO account_warnings (email, username, is_warned, updated_at)
+      VALUES ($1, $2, FALSE, NOW())
+      ON CONFLICT (email, username)
+      DO UPDATE SET is_warned = FALSE, updated_at = NOW();
+    `;
+    await pool.query(q, [email, username]);
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("POST /api/device/warn/ack error:", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
 
 
 
@@ -759,6 +955,11 @@ app.get("/saves", (req, res) => {
 app.get("/players", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "players.html"));
 });
+
+app.get("/ban", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "ban.html"));
+});
+
 
 // Backward compatible routes
 app.get("/admin", (req, res) => res.redirect("/saves"));

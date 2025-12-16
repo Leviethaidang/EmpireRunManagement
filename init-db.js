@@ -71,6 +71,28 @@ async function init() {
       CONSTRAINT unique_device UNIQUE (email, username, device_id)
     );
   `;
+
+    // ===== bans / warnings =====
+  const queryAccountWarnings = `
+    CREATE TABLE IF NOT EXISTS account_warnings (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      username TEXT NOT NULL,
+      is_warned BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      CONSTRAINT unique_account_warning UNIQUE (email, username)
+    );
+  `;
+
+  const queryDeviceBans = `
+    CREATE TABLE IF NOT EXISTS device_bans (
+      device_id TEXT PRIMARY KEY,
+      is_banned BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `;
+
+
   try {
     await pool.query(queryCloudSaves);
     console.log("Table cloud_saves created successfully!");
@@ -83,6 +105,12 @@ async function init() {
 
     await pool.query(queryAccountAchievements);
     console.log("Table account_achievements created successfully!");
+
+    await pool.query(queryAccountWarnings);
+    console.log("Table account_warnings created successfully!");
+
+    await pool.query(queryDeviceBans);
+    console.log("Table device_bans created successfully!");
 
     await pool.query(queryAccountDevices);
     console.log("Table account_devices created successfully!");
