@@ -86,6 +86,17 @@ async function init() {
 
     await pool.query(queryAccountDevices);
     console.log("Table account_devices created successfully!");
+        await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_account_devices_email_username
+      ON account_devices (email, username);
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_account_devices_device_lower
+      ON account_devices (LOWER(device_id));
+    `);
+    console.log("Indexes created successfully!");
+
+
   } catch (err) {
     console.error("Error creating table:", err);
   } finally {

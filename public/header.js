@@ -1,15 +1,19 @@
 // ===== Header loader + Lock=====
 const ADMIN_PASS = "123";
-
-
 const LOCK_KEY = "ERS_ADMIN_UNLOCKED";
+
 function setActiveNav() {
   const path = location.pathname.toLowerCase();
-  const isReports = path.includes("reports");
+
+  const isPlayers = path.includes("players");
+  const isSaves = path.includes("saves") || path.includes("admin");
+
   document.querySelectorAll(".nav-link").forEach(a => a.classList.remove("active"));
-  const sel = document.querySelector(`[data-nav="${isReports ? "reports" : "home"}"]`);
+
+  const sel = document.querySelector(`[data-nav="${isSaves ? "saves" : "players"}"]`);
   if (sel) sel.classList.add("active");
 }
+
 
 function showLock() {
   const overlay = document.getElementById("admin-lock-overlay");

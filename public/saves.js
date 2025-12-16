@@ -1,43 +1,3 @@
-// ===== Cấu hình mật mã admin =====
-const ADMIN_SECRET = "123";
-
-// ===== Overlay mật mã =====
-function setupAdminLock() {
-  const overlay = document.getElementById("admin-lock-overlay");
-  const input = document.getElementById("admin-pass-input");
-
-  if (!overlay || !input) return;
-
-  // Luôn cố gắng focus input ẩn
-  function focusHiddenInput() {
-    try {
-      input.focus();
-    } catch (_) {}
-  }
-
-  // Focus ngay khi load
-  focusHiddenInput();
-
-  // Click vào overlay cũng focus lại (phòng khi người dùng click chỗ khác)
-  overlay.addEventListener("click", () => {
-    focusHiddenInput();
-  });
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const value = input.value.trim();
-      if (value === ADMIN_SECRET) {
-        overlay.style.display = "none";
-        input.value = "";
-      } else {
-        // Sai mật mã: xoá sạch, chờ gõ lại
-        input.value = "";
-      }
-    }
-  });
-}
-
-
 // ===== UI helpers =====
 function setStatus(text) {
   const el = document.getElementById("status-line");
@@ -333,7 +293,6 @@ async function onDeleteSaveClicked(email, username) {
 
 // ===== Init =====
 document.addEventListener("DOMContentLoaded", () => {
-  setupAdminLock();
   loadStatus();
   loadEmails();
   showEmailView(); // đảm bảo mở đầu ở view email

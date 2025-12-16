@@ -59,7 +59,9 @@ h1{
 .log-list{
   flex:1;
   min-height:0;
-  overflow:auto;
+  overflow-y:auto;
+  overflow-x:hidden;
+
   background:#0f1520;
   border:1px solid #283141;
   border-radius:8px;
@@ -67,8 +69,22 @@ h1{
 
   display:flex;
   flex-direction:column;
-  justify-content:flex-end; 
+  justify-content:flex-start;
+  gap:8px;
 }
+.log-list{
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.log-list::-webkit-scrollbar{
+  width: 0;
+  height: 0;
+  display: none;
+}
+.log-item{
+  margin-bottom:0;
+}
+
 
 .log-item{
   padding:8px 10px;
@@ -206,58 +222,66 @@ tbody tr:hover{ background:#222a38; }
 }
 .player-search:focus{ border-color:#3a475f; }
 
-/* ===== Fit logs page into 1 screen (no body scroll) ===== */
+/* ===== Fit logs page into 1 screen ===== */
 body{
   height:100vh;
   overflow:hidden;
 }
 
-/* admin-root thành layout dọc để logs-layout ăn hết phần còn lại */
 .admin-root.wide{
   display:flex;
   flex-direction:column;
   height:100vh;
   overflow:hidden;
 
-  /* chừa chỗ cho topbar fixed 56px + một chút khoảng cách */
-  padding-top:72px;
+  padding-top:50px;
 }
 
-/* phần 2 cột phải co giãn trong phần còn lại */
+
 .logs-layout{
   flex:1;
   min-height:0;
 }
 
-/* 2 khu vực trái/phải không được làm tràn viewport */
 .stats-area,
 .logs-area{
   min-height:0;
 }
 
-/* Summary cố định chiều cao vừa đủ, Player List ăn phần còn lại */
 .stats-area .column:first-child{
   flex:0 0 auto;   
   min-height:0;
 }
 
-/* Player List: khóa chiều cao cả khối (để nhường chỗ cho Summary) */
 .stats-area .column:last-child{
-  flex:0 0 250px;
+  flex:0 0 280px;
   min-height:0;
   display:flex;
   flex-direction:column;
-  margin-top:auto;   /* đẩy Player List xuống sát đáy */
+  margin-top:auto;
 }
-/* bảng player sẽ cuộn bên trong */
 .player-table-wrap{
   flex:1;
   min-height:0;
   max-height:none;
   overflow:auto;
 }
+.player-table-wrap{
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.player-table-wrap::-webkit-scrollbar{
+  width: 0;
+  height: 0;
+  display: none;
+}
+.player-table-wrap thead th{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #222a38;
+}
 
-/* cột logs: cho column và log-list co giãn */
 .logs-area .column{
   height:100%;
   display:flex;
@@ -265,7 +289,6 @@ body{
   min-height:0;
 }
 
-/* mini modal */
 .modal-overlay{
   position:fixed;
   inset:0;

@@ -627,7 +627,8 @@ app.get("/api/admin/reports/players", async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(parseInt(req.query.limit || "50", 10), 200));
     const offset = Math.max(0, parseInt(req.query.offset || "0", 10));
-    const qStr = String(req.query.q || "").trim();
+    const qStr = String(req.query.q || "").trim().toLowerCase();
+    const q = qStr; // đã lower để match deviceId dễ hơn
 
     const query = `
       SELECT
@@ -636,30 +637,38 @@ app.get("/api/admin/reports/players", async (req, res) => {
         ar.wins_total,
         ar.losses_total,
         ar.achievements_count,
-        COALESCE(ad.device_count, 0) AS device_count
+        COALESCE(dev.device_count, 0) AS device_count
       FROM account_reports ar
       LEFT JOIN (
-        SELECT email, username, COUNT(*) AS device_count
+        SELECT email, username, COUNT(*)::int AS device_count
         FROM account_devices
         GROUP BY email, username
-      ) ad
-        ON ad.email = ar.email AND ad.username = ar.username
+      ) dev
+        ON dev.email = ar.email AND dev.username = ar.username
       WHERE
-        ($1 = '' OR ar.email ILIKE '%' || $1 || '%' OR ar.username ILIKE '%' || $1 || '%')
+        ($1 = '' OR
+          ar.email ILIKE '%' || $1 || '%' OR
+          ar.username ILIKE '%' || $1 || '%' OR
+          EXISTS (
+            SELECT 1
+            FROM account_devices ad
+            WHERE ad.email = ar.email
+              AND ad.username = ar.username
+              AND LOWER(ad.device_id) LIKE '%' || $1 || '%'
+          )
+        )
       ORDER BY ar.updated_at DESC
-      LIMIT $2
-      OFFSET $3;
+      LIMIT $2 OFFSET $3;
     `;
 
-    const values = [qStr, limit, offset];
-    const result = await pool.query(query, values);
-
+    const result = await pool.query(query, [q, limit, offset]);
     return res.json({ success: true, players: result.rows });
   } catch (err) {
     console.error("GET /api/admin/reports/players error:", err);
     return res.status(500).json({ success: false, error: "server_error" });
   }
 });
+
 
 
 // Detail
@@ -738,19 +747,22 @@ app.get("/status", (req, res) => {
   res.json({ ok: true, service: "EmpireRunServices" });
 });
 
-// Home (Admin Manager)
+// Pages
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
+  res.sendFile(path.join(__dirname, "public", "players.html"));
 });
 
-// Logs page (UI)
-app.get("/reports", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "reports.html"));
+app.get("/saves", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "saves.html"));
 });
 
-// ===== Hide .html routes =====
-app.get("/admin.html", (req, res) => res.redirect("/"));
-app.get("/reports.html", (req, res) => res.redirect("/reports"));
+app.get("/players", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "players.html"));
+});
+
+// Backward compatible routes
+app.get("/admin", (req, res) => res.redirect("/saves"));
+app.get("/reports", (req, res) => res.redirect("/players"));
 
 // đảm bảo luôn có row trong account_reports
 async function ensureAccountReportRow(client, email, username) {
