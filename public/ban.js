@@ -52,7 +52,7 @@ function createRow(item) {
 
   const btnClearWarn = document.createElement("button");
   btnClearWarn.className = "mini-btn";
-  btnClearWarn.textContent = "Clear Warn (Player)";
+  btnClearWarn.textContent = "UnWarn (Player)";
   btnClearWarn.onclick = async () => {
     await apiPost("/api/admin/ban/clear-warn", { email: item.email, username: item.username });
     await refresh();
@@ -61,6 +61,7 @@ function createRow(item) {
   const btnBan = document.createElement("button");
   btnBan.className = "mini-btn";
   btnBan.textContent = item.isBanned ? "Unban" : "Ban";
+  btnBan.style.minWidth = "60px";
   btnBan.onclick = async () => {
     await apiPost("/api/admin/ban/set-ban", { deviceId: item.deviceId, isBanned: !item.isBanned });
     await refresh();
@@ -95,3 +96,7 @@ if (searchInput) {
 
 // initial
 refresh();
+
+setInterval(() => {
+  refresh();
+}, 3000);
