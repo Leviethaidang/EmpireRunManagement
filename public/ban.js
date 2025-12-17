@@ -44,6 +44,7 @@ function createRow(item) {
 
   const btnWarn = document.createElement("button");
   btnWarn.className = "mini-btn";
+  btnWarn.classList.add("btn-warn");
   btnWarn.textContent = "Warn (Device)";
   btnWarn.onclick = async () => {
     await apiPost("/api/admin/ban/warn-device", { deviceId: item.deviceId });
@@ -53,6 +54,7 @@ function createRow(item) {
   const btnClearWarn = document.createElement("button");
   btnClearWarn.className = "mini-btn";
   btnClearWarn.textContent = "UnWarn (Player)";
+  btnClearWarn.classList.add("btn-unwarn");
   btnClearWarn.onclick = async () => {
     await apiPost("/api/admin/ban/clear-warn", { email: item.email, username: item.username });
     await refresh();
@@ -60,6 +62,7 @@ function createRow(item) {
 
   const btnBan = document.createElement("button");
   btnBan.className = "mini-btn";
+  btnBan.classList.add(item.isBanned ? "btn-unban" : "btn-ban");
   btnBan.textContent = item.isBanned ? "Unban" : "Ban";
   btnBan.style.minWidth = "60px";
   btnBan.onclick = async () => {

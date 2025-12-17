@@ -74,13 +74,14 @@ async function loadEmails() {
       tdActions.style.textAlign = "right";
 
       const btn = document.createElement("button");
-      btn.className = "actions-btn";
-      btn.textContent = "⋮";
+      btn.className = "mini-btn";
+      btn.textContent = "Delete";
       btn.addEventListener("click", (ev) => {
-        openEmailMenu(ev, item.email);
+        ev.stopPropagation();
+        onDeleteEmailClicked(item.email);
       });
-
       tdActions.appendChild(btn);
+
 
       tr.appendChild(tdEmail);
       tr.appendChild(tdCount);
@@ -111,47 +112,7 @@ function showSavesView() {
   if (emailView) emailView.classList.add("hidden");
   if (savesView) savesView.classList.remove("hidden");
 }
-// ===== Context menu state =====
-let menuState = {
-  type: null,       // "email" hoặc "save"
-  email: null,
-  username: null,
-};
 
-function openEmailMenu(ev, email) {
-  ev.stopPropagation();
-  const menu = document.getElementById("context-menu");
-  if (!menu) return;
-
-  menuState.type = "email";
-  menuState.email = email;
-  menuState.username = null;
-
-  menu.style.left = ev.clientX + "px";
-  menu.style.top = ev.clientY + "px";
-  menu.classList.remove("hidden");
-}
-
-function openSaveMenu(ev, email, username) {
-  ev.stopPropagation();
-  const menu = document.getElementById("context-menu");
-  if (!menu) return;
-
-  menuState.type = "save";
-  menuState.email = email;
-  menuState.username = username;
-
-  menu.style.left = ev.clientX + "px";
-  menu.style.top = ev.clientY + "px";
-  menu.classList.remove("hidden");
-}
-
-function hideContextMenu() {
-  const menu = document.getElementById("context-menu");
-  if (menu) {
-    menu.classList.add("hidden");
-  }
-}
 let currentSelectedEmail = null;
 // Khi click vào 1 email
 function onEmailRowClicked(email) {
@@ -241,13 +202,12 @@ async function loadSavesForEmail(email) {
       tdActions.style.textAlign = "right";
 
       const btn = document.createElement("button");
-      btn.className = "actions-btn";
-      btn.textContent = "⋮";
+      btn.className = "mini-btn";
+      btn.textContent = "Delete";
       btn.addEventListener("click", (ev) => {
-        openSaveMenu(ev, email, item.username);
+        ev.stopPropagation();
+        onDeleteSaveClicked(email, item.username);
       });
-
-
       tdActions.appendChild(btn);
 
       tr.appendChild(tdUser);
@@ -314,35 +274,5 @@ document.addEventListener("DOMContentLoaded", () => {
         showEmailView();
     });
     }
-
-    // ===== Context menu bindings =====
-  const menu = document.getElementById("context-menu");
-  const deleteBtn = document.getElementById("menu-delete-btn");
-
-  // Click ra ngoài -> đóng menu
-  document.addEventListener("click", () => {
-    hideContextMenu();
-  });
-
-  if (menu) {
-    menu.addEventListener("click", (ev) => {
-      ev.stopPropagation(); // tránh click menu làm đóng ngay
-    });
-  }
-
-  if (deleteBtn) {
-    deleteBtn.addEventListener("click", () => {
-      hideContextMenu();
-      if (menuState.type === "email" && menuState.email) {
-        onDeleteEmailClicked(menuState.email);
-      } else if (
-        menuState.type === "save" &&
-        menuState.email &&
-        menuState.username
-      ) {
-        onDeleteSaveClicked(menuState.email, menuState.username);
-      }
-    });
-  }
 });
 

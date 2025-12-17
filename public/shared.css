@@ -1,6 +1,15 @@
 /* shared.css */
 *{ box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-body{ margin:0; background:#0b1018; color:#f3f3f3; }
+
+body{
+  margin:0;
+  color:#f3f3f3;
+  background:
+    url("/img/BlankBG.png") center center / cover no-repeat fixed;
+
+  background-color:#0b1018; /* fallback nếu ảnh lỗi */
+}
+
 
 .admin-root{ 
     max-width:1100px; 
@@ -8,10 +17,17 @@ body{ margin:0; background:#0b1018; color:#f3f3f3; }
     padding:16px; 
     padding-top:50px; 
 }
+
+body.page-ban .admin-root.wide{
+  max-width:1100px;
+  margin:0 auto;
+}
+
 h1{ 
     margin:16px 0 8px; 
-    font-size:24px; 
+    font-size:30px; 
     text-align:center; 
+    color:#b22222;
 }
 
 .status-line{ 
@@ -39,13 +55,58 @@ h1{
 .hidden{ display:none; }
 
 /* Header */
-.topbar{ position:fixed; top:0; left:0; right:0; height:56px; background:#151b26; border-bottom:1px solid #283141; z-index:1000; }
-.topbar-inner{ max-width:1100px; margin:0 auto; height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; }
-.brand{ font-weight:700; }
-.nav{ display:flex; gap:10px; }
-.nav-link{ color:#f3f3f3; text-decoration:none; padding:8px 10px; border-radius:6px; background:#1e2533; }
-.nav-link.active{ background:#222a38; }
-.nav-link:hover{ background:#222a38; }
+.topbar{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  height:56px;
+
+  background:#b22222; /* đỏ tươi */
+  border-bottom:1px solid rgba(0,0,0,0.35);
+  z-index:1000;
+}
+
+
+.topbar-inner{ 
+  max-width:1100px; 
+  margin:0 auto; 
+  height:56px; 
+  display:flex; 
+  align-items:center; 
+  justify-content:space-between; 
+  padding:0 16px; 
+}
+.brand{
+  font-weight:800;
+  font-size:20px;
+}
+.nav{ 
+  display:flex; 
+  gap:10px; 
+}
+.nav-link{
+  color:#fff;
+  text-decoration:none;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  min-width:70px;      /* 3 nút đều nhau */
+  height:35px;         /* chiều cao đồng bộ */
+  padding:0 14px;
+
+  border-radius:10px;
+  background:#2e7d32;  /* xanh lá */
+  font-weight:600;
+}
+.nav-link.active{ 
+  background:#2b77bf; 
+}
+.nav-link:hover{ 
+  background:#2b77bf; 
+}
 
 .lock-overlay{
   display:none; 
@@ -115,9 +176,21 @@ th, td{
   border-bottom:1px solid #283141;
   text-align:left;
 }
-
 tbody tr{ cursor:pointer; }
 tbody tr:hover{ background:#222a38; }
+
+body.page-saves .admin-root{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+body.page-saves #email-view,
+body.page-saves #saves-view{
+  flex:1;
+  min-height:0;
+}
 
 /* ===== Admin buttons/menu ===== */
 .actions-btn{
@@ -162,6 +235,43 @@ tbody tr:hover{ background:#222a38; }
 }
 .context-menu button:hover{ background:#ff4444; }
 
+#email-view table{
+  table-layout: fixed;
+}
+
+#email-view th:nth-child(1), #email-view td:nth-child(1){ width: 30%; } /* Email */
+#email-view th:nth-child(2), #email-view td:nth-child(2){ width: 27%; } /* Saves */
+#email-view th:nth-child(3), #email-view td:nth-child(3){ width: 33%; } /* Latest */
+#email-view th:nth-child(4), #email-view td:nth-child(4){ width: 10%; } 
+
+#saves-view table{
+  table-layout: fixed;
+}
+
+#saves-view th:nth-child(1), #saves-view td:nth-child(1){ width: 55%; } /* Username */
+#saves-view th:nth-child(2), #saves-view td:nth-child(2){ width: 35%; } /* Updated At */
+#saves-view th:nth-child(3), #saves-view td:nth-child(3){ width: 10%; }
+
+#email-view .mini-btn,
+#saves-view .mini-btn{
+  background:#ff4b4b;
+  border-color:#c23a3a;
+  color:#0b1018;
+}
+#email-view .mini-btn:hover,
+#saves-view .mini-btn:hover{
+  background:#f3c74b;
+  border-color:#caa23a;
+  color:#151b26;
+  filter:none;
+}
+#saves-view tbody tr{
+  cursor: default;
+}
+#saves-view tbody tr:hover{
+  background: transparent;
+}
+
 
 /* ===== Logs page layout (new) ===== */
 .admin-root.wide{
@@ -187,13 +297,11 @@ tbody tr:hover{ background:#222a38; }
   min-height:0;
 }
 
-/* right side: keep logs block size, stick to right */
 .logs-area{
-  width:420px; /* giữ khối logs gọn như hiện tại */
+  width:420px;
   flex:0 0 420px;
 }
 
-/* summary content */
 .summary-grid{
   display:grid;
   grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -351,6 +459,7 @@ body{
   padding:6px 10px;
   cursor:pointer;
   font-size:12px;
+  font-weight:600; 
   margin-right:8px;
 }
 .mini-btn:hover{ background:#222a38; }
@@ -361,29 +470,27 @@ body{
 
 .ban-table{
   width:100%;
-  table-layout: fixed;   /* giúp chia cột theo tỷ lệ mình set */
+  table-layout: fixed;
 }
 
-.ban-table th:nth-child(1), .ban-table td:nth-child(1){ width: 30%; } /* Player */
-.ban-table th:nth-child(2), .ban-table td:nth-child(2){ width: 25%; } /* DeviceID */
-.ban-table th:nth-child(3), .ban-table td:nth-child(3){ width: 10%; } /* Warn */
-.ban-table th:nth-child(4), .ban-table td:nth-child(4){ width: 10%; } /* Ban */
-.ban-table th:nth-child(5), .ban-table td:nth-child(5){
-  width: 25%;
-  min-width: 360px;
-}
-
-.ban-table td{
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
+.ban-table th:nth-child(1), .ban-table td:nth-child(1){ width: 22%; } /* Player */
+.ban-table th:nth-child(2), .ban-table td:nth-child(2){ width: 18%; } /* DeviceID */
+.ban-table th:nth-child(3), .ban-table td:nth-child(3){ width: 15%; }  /* Warn */
+.ban-table th:nth-child(4), .ban-table td:nth-child(4){ width: 15%; }  /* Ban */
+.ban-table th:nth-child(5), .ban-table td:nth-child(5){ width: 30%; } /* Action */
 
 .ban-table td.ban-actions{
   display:flex;
+  width:100%;
   justify-content:flex-end;
   align-items:center;
   gap:8px;
+  flex-wrap:wrap;
+}
+.ban-table td.ban-actions .mini-btn{
+  padding:6px 10px;
+  font-size:12px;
+  white-space:nowrap;
 }
 
 .ban-table td.ban-actions .mini-btn{
@@ -392,4 +499,39 @@ body{
 .ban-table thead th:nth-child(5){
   text-align:right;
   padding-right: 120px;
+}
+
+body.page-ban .ban-table tbody tr{
+  cursor: default;
+}
+body.page-ban .ban-table tbody tr:hover{
+  background: transparent;
+}
+/* Ban buttons */
+.mini-btn.btn-warn{
+  background:#f3c74b;
+  border-color:#caa23a;
+  color:#151b26;
+}
+.mini-btn.btn-unwarn{
+  background:#3aa0ff;
+  border-color:#2b77bf;
+  color:#0b1018;
+}
+.mini-btn.btn-ban{
+  background:#ff4b4b;
+  border-color:#c23a3a;
+  color:#0b1018;
+}
+.mini-btn.btn-unban{
+  background:#35c46a;
+  border-color:#2a9b53;
+  color:#0b1018;
+}
+
+.mini-btn.btn-warn:hover,
+.mini-btn.btn-unwarn:hover,
+.mini-btn.btn-ban:hover,
+.mini-btn.btn-unban:hover{
+  filter:brightness(0.5);
 }
