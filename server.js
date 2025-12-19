@@ -7,7 +7,7 @@ const bodyParser = require("body-parser");
 const { Pool } = require("pg");
 const cors = require("cors");
 const path = require("path");
-const nodemailer = require("nodemailer");
+const { buildLicenseEmailHtml, buildLicenseEmailText } = require("./emailTemplates");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -1159,18 +1159,6 @@ function requireMainWebKey(req, res, next) {
   next();
 }
 
-function createMailTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    secure: false, // 587 = STARTTLS
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-}
-
 async function sendLicenseKeyEmail(toEmail, key, orderCode) {
   const apiKey = process.env.SENDGRID_API_KEY;
   const fromEmail = process.env.SENDGRID_FROM;
@@ -1180,17 +1168,8 @@ async function sendLicenseKeyEmail(toEmail, key, orderCode) {
   if (!toEmail) throw new Error("missing_toEmail");
 
   const subject = "Your Empire Run License Key";
-  const html = `
-    <div style="font-family:system-ui,Segoe UI,Roboto,Arial;">
-      <h2>Empire Run - License Key</h2>
-      <p>Order Code: <b>${String(orderCode || "")}</b></p>
-      <p>Your key:</p>
-      <div style="font-size:20px; font-weight:700; padding:12px; border:1px solid #ddd; display:inline-block;">
-        ${String(key || "")}
-      </div>
-      <p style="margin-top:16px; opacity:0.8;">Thank you for supporting Empire Run!</p>
-    </div>
-  `;
+  const html = buildLicenseEmailHtml(orderCode, key);
+  const text = buildLicenseEmailText(orderCode, key);
 
   // SendGrid v3 Mail Send API
   const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -1203,7 +1182,10 @@ async function sendLicenseKeyEmail(toEmail, key, orderCode) {
       personalizations: [{ to: [{ email: toEmail }] }],
       from: { email: fromEmail, name: "Empire Run" },
       subject,
-      content: [{ type: "text/html", value: html }],
+      content: [
+        { type: "text/plain", value: text },
+        { type: "text/html", value: html },
+      ],
     }),
   });
 
@@ -1211,9 +1193,9 @@ async function sendLicenseKeyEmail(toEmail, key, orderCode) {
   if (res.status === 202) return { ok: true };
 
   // lỗi thì đọc text để show message, rồi throw để route approve rollback
-  const text = await res.text();
+  const errText = await res.text();
   let data = {};
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  try { data = JSON.parse(errText); } catch { data = { raw: errText }; }
 
   const msg =
     (data?.errors && data.errors[0]?.message) ||
