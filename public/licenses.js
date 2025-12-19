@@ -116,9 +116,8 @@ async function onApproveOrder(id) {
       body: JSON.stringify({ id }),
     });
 
-    // nếu approve OK, reload
+    // approve OK, reload
     await loadAll();
-    alert(`Approved!\nKey: ${data.issuedKey || "(no key)"}`);
   } catch (e) {
     alert("Approve failed: " + e.message);
   }
