@@ -6,12 +6,15 @@ function setActiveNav() {
   const path = location.pathname.toLowerCase();
 
   const isPlayers = path.includes("players");
+  const isLicenses = path.includes("licenses");
   const isSaves = path.includes("saves");
   const isBan = path.includes("/ban");
 
   document.querySelectorAll(".nav-link").forEach(a => a.classList.remove("active"));
 
-  const sel = document.querySelector(`[data-nav="${isSaves ? "saves" : (isBan ? "ban" : "players")}"]`);
+  const navKey = isSaves ? "saves" : (isLicenses ? "licenses" : (isBan ? "ban" : "players"));
+  const sel = document.querySelector(`[data-nav="${navKey}"]`);
+
   if (sel) sel.classList.add("active");
 }
 

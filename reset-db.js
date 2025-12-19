@@ -15,9 +15,16 @@ async function reset() {
   console.log("RESETTING DATABASE TABLES...");
 
   const dropSql = `
+    -- Drop tables that depend on others first
+    DROP TABLE IF EXISTS license_keys CASCADE;
+    DROP TABLE IF EXISTS orders CASCADE;
+
     DROP TABLE IF EXISTS account_devices CASCADE;
     DROP TABLE IF EXISTS account_achievements CASCADE;
     DROP TABLE IF EXISTS account_reports CASCADE;
+    DROP TABLE IF EXISTS account_warnings CASCADE;
+    DROP TABLE IF EXISTS device_bans CASCADE;
+
     DROP TABLE IF EXISTS cloud_logs CASCADE;
     DROP TABLE IF EXISTS cloud_saves CASCADE;
   `;

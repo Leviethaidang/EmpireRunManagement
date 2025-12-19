@@ -91,6 +91,32 @@ async function init() {
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `;
+  //order và key
+    const queryOrders = `
+    CREATE TABLE IF NOT EXISTS orders (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      order_code TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'pending', -- pending | paid | cancelled
+      amount INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      paid_at TIMESTAMP NULL,
+      issued_key TEXT NULL
+    );
+  `;
+
+  const queryLicenseKeys = `
+    CREATE TABLE IF NOT EXISTS license_keys (
+      id SERIAL PRIMARY KEY,
+      license_key TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL,
+      order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'unused', -- unused | activated
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      activated_at TIMESTAMP NULL,
+      device_hash TEXT NULL
+    );
+  `;
 
 
   try {
@@ -114,7 +140,8 @@ async function init() {
 
     await pool.query(queryAccountDevices);
     console.log("Table account_devices created successfully!");
-        await pool.query(`
+
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_account_devices_email_username
       ON account_devices (email, username);
     `);
@@ -123,7 +150,17 @@ async function init() {
       ON account_devices (LOWER(device_id));
     `);
     console.log("Indexes created successfully!");
+    
+    await pool.query(queryOrders);
+    console.log("Table orders created successfully!");
 
+    await pool.query(queryLicenseKeys);
+    console.log("Table license_keys created successfully!");
+
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_email ON orders (email);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_license_keys_email ON license_keys (email);`);
+    console.log("License indexes created successfully!");
+    
 
   } catch (err) {
     console.error("Error creating table:", err);

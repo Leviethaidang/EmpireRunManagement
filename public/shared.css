@@ -372,6 +372,14 @@ body{
   flex-direction:column;
   margin-top:auto;
 }
+body.page-licenses .stats-area .column:last-child{
+  flex:0 0 350px;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  margin-top:auto;
+}
+
 .player-table-wrap{
   flex:1;
   min-height:0;
@@ -534,4 +542,36 @@ body.page-ban .ban-table tbody tr:hover{
 .mini-btn.btn-ban:hover,
 .mini-btn.btn-unban:hover{
   filter:brightness(0.5);
+}
+
+/* ===== Licenses: Keys list layout ===== */
+body.page-licenses #key-list .log-line{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+body.page-licenses #key-list .key-code{
+  text-align:left;
+  font-weight:700;
+  letter-spacing:0.2px;
+}
+
+body.page-licenses #key-list .key-status{
+  margin-left:auto;
+  text-align:right;
+  font-weight:700;
+}
+
+body.page-licenses #key-list .key-status{
+  font-weight:700;
+}
+
+body.page-licenses #key-list .key-status.inactive{
+  color:#ff4d4d;
+}
+
+body.page-licenses #key-list .key-status.active{
+  color:#2ecc71; 
 }

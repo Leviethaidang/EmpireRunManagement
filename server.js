@@ -1,12 +1,18 @@
-//server.js
+if (!process.env.RENDER) {
+  require("dotenv").config();
+}
+//server.js của web admin
 const express = require("express");
 const bodyParser = require("body-parser");
 const { Pool } = require("pg");
 const cors = require("cors");
 const path = require("path");
+const nodemailer = require("nodemailer");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+const MAIN_WEB_API_KEY = process.env.MAIN_WEB_API_KEY || "123";
 
 // ===== Middleware =====
 app.use(cors());
@@ -418,6 +424,32 @@ app.post("/api/report/register", async (req, res) => {
     return res.status(500).json({ success: false, error: "server_error" });
   }
 });
+// ===== License Order: Main Web -> Admin Web =====
+// Body: { email, orderCode, amount }
+app.post("/api/license/order/create", requireMainWebKey, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body.email);
+    const orderCode = String(req.body.orderCode || "").trim();
+    const amount = parseInt(req.body.amount || "0", 10) || 0;
+
+    if (!email || !orderCode) {
+      return res.status(400).json({ success: false, error: "missing_email_or_orderCode" });
+    }
+
+    await pool.query(
+      `INSERT INTO orders (email, order_code, amount, status)
+       VALUES ($1, $2, $3, 'pending')
+       ON CONFLICT (order_code) DO NOTHING;`,
+      [email, orderCode, amount]
+    );
+
+    return res.json({ success: true });
+  } catch (err) {
+    logDbError("license/order/create", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
 
 //===Phần dành cho admin=====
 // ====== ADMIN APIs ======
@@ -864,6 +896,95 @@ app.post("/api/admin/ban/set-ban", async (req, res) => {
   }
 });
 
+// Approve order -> generate license key -> save DB -> send email
+app.post("/api/admin/orders/approve", async (req, res) => {
+  const id = parseInt(req.body.id || "0", 10);
+  if (!id) return res.status(400).json({ success: false, error: "missing_id" });
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const o = await client.query(
+      `SELECT id, email, order_code, status, issued_key
+       FROM orders
+       WHERE id = $1
+       FOR UPDATE;`,
+      [id]
+    );
+
+    if (o.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ success: false, error: "order_not_found" });
+    }
+
+    const order = o.rows[0];
+
+    if (order.status !== "pending") {
+      await client.query("ROLLBACK");
+      return res.json({
+        success: true,
+        message: "order_not_pending",
+        issuedKey: order.issued_key || null,
+      });
+    }
+
+    // key đã tồn tại thì dùng lại
+    let key = order.issued_key;
+
+    if (!key) {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const candidate = generateLicenseKey10();
+        const exists = await client.query(
+          `SELECT 1 FROM license_keys WHERE license_key = $1 LIMIT 1;`,
+          [candidate]
+        );
+        if (exists.rows.length === 0) {
+          key = candidate;
+          break;
+        }
+      }
+      if (!key) throw new Error("failed_to_generate_unique_key");
+    }
+
+    // upsert license_keys
+    await client.query(
+      `INSERT INTO license_keys (license_key, email, order_id, status)
+       VALUES ($1, $2, $3, 'unused')
+       ON CONFLICT (license_key) DO NOTHING;`,
+      [key, order.email, order.id]
+    );
+
+    // update order nhưng CHƯA commit vội
+    await client.query(
+      `UPDATE orders
+       SET status='paid', paid_at=NOW(), issued_key=$2
+       WHERE id=$1;`,
+      [order.id, key]
+    );
+
+    // GỬI MAIL TRƯỚC
+    try {
+      await sendLicenseKeyEmail(order.email, key, order.order_code);
+    } catch (mailErr) {
+      console.error("[MAIL ERROR] approve failed:", mailErr);
+      await client.query("ROLLBACK");
+      return res.status(500).json({ success: false, error: "mail_failed" });
+    }
+
+    await client.query("COMMIT");
+
+    return res.json({ success: true, issuedKey: key, email: order.email });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    logDbError("admin/orders/approve", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  } finally {
+    client.release();
+  }
+});
+
+
 
 // ===== Unity APIs =====
 
@@ -921,6 +1042,102 @@ app.post("/api/device/warn/ack", async (req, res) => {
     return res.status(500).json({ success: false, error: "server_error" });
   }
 });
+// Unity activate key (one-time)
+// Body: { key }
+app.post("/api/unity/license/activate", async (req, res) => {
+  const key = String(req.body.key || "").trim().toUpperCase();
+  if (!key) return res.status(400).json({ success: false, error: "missing_key" });
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Lock key row to avoid double activation
+    const r = await client.query(
+      `SELECT id, status
+       FROM license_keys
+       WHERE license_key = $1
+       FOR UPDATE;`,
+      [key]
+    );
+
+    if (r.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.json({ success: true, valid: false, reason: "not_found" });
+    }
+
+    const row = r.rows[0];
+
+    if (row.status === "activated") {
+      await client.query("ROLLBACK");
+      return res.json({ success: true, valid: false, reason: "already_activated" });
+    }
+
+    // Activate now
+    await client.query(
+      `UPDATE license_keys
+       SET status='activated', activated_at=NOW()
+       WHERE id=$1;`,
+      [row.id]
+    );
+
+    await client.query("COMMIT");
+    return res.json({ success: true, valid: true });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    logDbError("unity/license/activate", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  } finally {
+    client.release();
+  }
+});
+// Lấy danh sách order theo status (pending)
+app.get("/api/admin/orders", async (req, res) => {
+  try {
+    const status = String(req.query.status || "").trim();
+
+    if (!status) {
+      return res.status(400).json({ success: false, error: "missing_status" });
+    }
+
+    const r = await pool.query(
+      `SELECT id, email, order_code, status, created_at
+       FROM orders
+       WHERE status = $1
+       ORDER BY created_at ASC;`,
+      [status]
+    );
+
+    return res.json({ success: true, orders: r.rows });
+  } catch (err) {
+    logDbError("admin/orders/list", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+// Huỷ (xoá) order đang chờ
+app.post("/api/admin/orders/cancel", async (req, res) => {
+  const id = parseInt(req.body.id || "0", 10);
+  if (!id) return res.status(400).json({ success: false, error: "missing_id" });
+
+  try {
+    const r = await pool.query(
+      `DELETE FROM orders
+       WHERE id = $1 AND status = 'pending'
+       RETURNING id;`,
+      [id]
+    );
+
+    if (r.rowCount === 0) {
+      return res.json({ success: false, error: "order_not_found_or_not_pending" });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    logDbError("admin/orders/cancel", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
 
 
 
@@ -934,36 +1151,58 @@ function logDbError(context, err) {
   console.error(`[DB ERROR] ${context}:`, err);
 }
 
-// ===== Khởi động server =====
-app.listen(PORT, () => {
-  console.log(`EmpireRunServices running at http://localhost:${PORT}`);
-});
-// ===== Route =====
-app.get("/status", (req, res) => {
-  res.json({ ok: true, service: "EmpireRunServices" });
-});
+function requireMainWebKey(req, res, next) {
+  const key = String(req.headers["x-api-key"] || "");
+  if (!MAIN_WEB_API_KEY || key !== MAIN_WEB_API_KEY) {
+    return res.status(401).json({ success: false, error: "unauthorized" });
+  }
+  next();
+}
 
-// Pages
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "players.html"));
-});
+function createMailTransporter() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || "587", 10),
+    secure: false, // 587 = STARTTLS
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
 
-app.get("/saves", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "saves.html"));
-});
+async function sendLicenseKeyEmail(toEmail, licenseKey, orderCode) {
+  const transporter = createMailTransporter();
 
-app.get("/players", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "players.html"));
-});
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const subject = "Your Empire Run License Key";
 
-app.get("/ban", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "ban.html"));
-});
+  const text =
+    `Cảm ơn bạn đã mua bản quyền Empire Run!
+
+    OrderCode: ${orderCode}
+    License Key: ${licenseKey}
+
+    Mở game và nhập key để kích hoạt.
+    (Lưu ý: key chỉ dùng cho 1 máy)`;
+
+  await transporter.sendMail({
+    from,
+    to: toEmail,
+    subject,
+    text,
+  });
+}
+function generateLicenseKey10() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 10; i++) {
+    s += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return s;
+}
 
 
-// Backward compatible routes
-app.get("/admin", (req, res) => res.redirect("/saves"));
-app.get("/reports", (req, res) => res.redirect("/players"));
 
 // đảm bảo luôn có row trong account_reports
 async function ensureAccountReportRow(client, email, username) {
@@ -1000,4 +1239,79 @@ app.get("/db-status", async (req, res) => {
     logDbError("db-status", err);
     res.status(500).json({ ok: false, error: String(err) });
   }
+});
+//test list order
+app.get("/api/admin/orders/test", async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT id, email, order_code, status, created_at
+       FROM orders
+       ORDER BY created_at DESC
+       LIMIT 10;`
+    );
+    res.json({ success: true, orders: r.rows });
+  } catch (err) {
+    logDbError("orders/test", err);
+    res.status(500).json({ success: false });
+  }
+});
+//test list license keys
+app.get("/api/admin/license-keys", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || "200", 10) || 200, 500);
+
+    const r = await pool.query(
+      `SELECT id, license_key, status, created_at, activated_at
+       FROM license_keys
+       ORDER BY id DESC
+       LIMIT $1;`,
+      [limit]
+    );
+
+    // trả thêm isActivated cho UI dễ dùng
+    const keys = r.rows.map(k => ({
+      id: k.id,
+      key: k.license_key,
+      status: k.status,              // 'unused' | 'activated'
+      isActivated: k.status === "activated",
+      createdAt: k.created_at,
+      activatedAt: k.activated_at,
+    }));
+
+    return res.json({ success: true, keys });
+  } catch (err) {
+    logDbError("admin/license-keys", err);
+    return res.status(500).json({ success: false, error: "server_error" });
+  }
+});
+
+
+// ===== Khởi động server =====
+app.listen(PORT, () => {
+  console.log(`EmpireRunServices running at http://localhost:${PORT}`);
+});
+// ===== Route =====
+app.get("/status", (req, res) => {
+  res.json({ ok: true, service: "EmpireRunServices" });
+});
+
+// Pages
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "players.html"));
+});
+
+app.get("/saves", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "saves.html"));
+});
+
+app.get("/players", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "players.html"));
+});
+
+app.get("/ban", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "ban.html"));
+});
+
+app.get("/licenses", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "licenses.html"));
 });

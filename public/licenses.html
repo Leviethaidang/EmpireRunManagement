@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>EmpireRun Services</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/shared.css" />
+</head>
+<body class="page-licenses">
+  <div id="header-slot"></div>
+
+  <div class="admin-root wide">
+    <h1>License Management</h1>
+
+    <div class="logs-layout">
+      <!-- LEFT -->
+      <div class="stats-area">
+        <div class="column">
+          <h2>Summary</h2>
+          <div id="summary-grid" class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Total Keys</div>
+              <div class="summary-value" id="sum-keys">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Revenue (VND)</div>
+              <div class="summary-value" id="sum-revenue">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Activated Keys</div>
+              <div class="summary-value" id="sum-activated">-</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Waiting Orders</div>
+              <div class="summary-value" id="sum-waiting">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="column">
+          <h2>Order Waiting</h2>
+          <div class="player-toolbar">
+            <input id="order-search" class="player-search" placeholder="Search by order code / email" />
+          </div>
+          <div class="player-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order Code</th>
+                  <th>Email</th>
+                  <th style="text-align:right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="logs-area">
+        <div class="column">
+          <h2>Keys</h2>
+          <div id="key-list" class="log-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    fetch("/header.html")
+      .then(r => r.text())
+      .then(html => {
+        document.getElementById("header-slot").innerHTML = html;
+        const s = document.createElement("script");
+        s.src = "/header.js";
+        s.onload = () => window.__ERS_Header && window.__ERS_Header.init();
+        document.body.appendChild(s);
+      });
+  </script>
+
+  <script src="/licenses.js"></script>
+</body>
+</html>
