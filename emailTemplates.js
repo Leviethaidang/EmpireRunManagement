@@ -21,7 +21,7 @@ function buildLicenseEmailHtml(orderCode, licenseKey) {
 
       <div style="background:linear-gradient(135deg,#b30000,#ff3300);padding:24px 16px;text-align:center;border-radius:4px 4px 0 0;">
         <h1 style="margin:0 0 12px 0;font-size:18px;text-transform:uppercase;letter-spacing:2px;color:#ffd966;text-align:center;">
-          LICENSE KEY ISSUED
+          EMPIRE RUN ACCESS AUTHORIZED
         </h1>
         <div style="margin-top:8px;font-size:12px;color:#ffe9b3;letter-spacing:2px;text-transform:uppercase;">
           Workers of the world, unite!
@@ -56,12 +56,11 @@ function buildLicenseEmailHtml(orderCode, licenseKey) {
           <ul style="margin:8px 0 0 18px;padding:0;">
             <li>Open the game and go to <strong>Activate Key</strong>.</li>
             <li>Paste the key above and press <strong>Activate</strong>.</li>
-            <li>Keep this email for future reference.</li>
           </ul>
         </div>
 
         <p style="margin:16px 0 0 0;font-size:11px;line-height:1.4;color:#e6cbb0;text-align:center;">
-          If you didn't request this purchase, please reply to this email.
+          Stand firm, Comrade. The Empire marches forward with you!
         </p>
       </div>
 
