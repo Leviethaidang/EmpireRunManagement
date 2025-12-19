@@ -967,7 +967,7 @@ app.post("/api/admin/orders/approve", async (req, res) => {
     try {
       await sendLicenseKeyEmail(order.email, key, order.order_code);
     } catch (mailErr) {
-      console.error("[MAIL ERROR] approve failed:", mailErr);
+      console.error("[MAIL ERROR] approve failed:", mailErr?.message || mailErr);
       await client.query("ROLLBACK");
       return res.status(500).json({ success: false, error: "mail_failed" });
     }
@@ -1172,11 +1172,11 @@ function createMailTransporter() {
 }
 
 async function sendLicenseKeyEmail(toEmail, key, orderCode) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM;
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const fromEmail = process.env.SENDGRID_FROM;
 
-  if (!apiKey) throw new Error("missing_RESEND_API_KEY");
-  if (!from) throw new Error("missing_RESEND_FROM");
+  if (!apiKey) throw new Error("missing_SENDGRID_API_KEY");
+  if (!fromEmail) throw new Error("missing_SENDGRID_FROM");
   if (!toEmail) throw new Error("missing_toEmail");
 
   const subject = "Your Empire Run License Key";
@@ -1192,30 +1192,35 @@ async function sendLicenseKeyEmail(toEmail, key, orderCode) {
     </div>
   `;
 
-  const res = await fetch("https://api.resend.com/emails", {
+  // SendGrid v3 Mail Send API
+  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from,
-      to: [toEmail],
+      personalizations: [{ to: [{ email: toEmail }] }],
+      from: { email: fromEmail, name: "Empire Run" },
       subject,
-      html,
+      content: [{ type: "text/html", value: html }],
     }),
   });
 
+  // SendGrid trả 202 là accepted (gửi OK)
+  if (res.status === 202) return { ok: true };
+
+  // lỗi thì đọc text để show message, rồi throw để route approve rollback
   const text = await res.text();
   let data = {};
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
-  if (!res.ok) {
-    // ném lỗi để route approve bắt và rollback
-    throw new Error(data?.message || data?.error || `Resend HTTP ${res.status}`);
-  }
+  const msg =
+    (data?.errors && data.errors[0]?.message) ||
+    data?.message ||
+    `SendGrid HTTP ${res.status}`;
 
-  return data;
+  throw new Error(msg);
 }
 
 function generateLicenseKey10() {
