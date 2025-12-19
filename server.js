@@ -1171,28 +1171,53 @@ function createMailTransporter() {
   });
 }
 
-async function sendLicenseKeyEmail(toEmail, licenseKey, orderCode) {
-  const transporter = createMailTransporter();
+async function sendLicenseKeyEmail(toEmail, key, orderCode) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM;
 
-  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  if (!apiKey) throw new Error("missing_RESEND_API_KEY");
+  if (!from) throw new Error("missing_RESEND_FROM");
+  if (!toEmail) throw new Error("missing_toEmail");
+
   const subject = "Your Empire Run License Key";
+  const html = `
+    <div style="font-family:system-ui,Segoe UI,Roboto,Arial;">
+      <h2>Empire Run - License Key</h2>
+      <p>Order Code: <b>${String(orderCode || "")}</b></p>
+      <p>Your key:</p>
+      <div style="font-size:20px; font-weight:700; padding:12px; border:1px solid #ddd; display:inline-block;">
+        ${String(key || "")}
+      </div>
+      <p style="margin-top:16px; opacity:0.8;">Thank you for supporting Empire Run!</p>
+    </div>
+  `;
 
-  const text =
-    `Cảm ơn bạn đã mua bản quyền Empire Run!
-
-    OrderCode: ${orderCode}
-    License Key: ${licenseKey}
-
-    Mở game và nhập key để kích hoạt.
-    (Lưu ý: key chỉ dùng cho 1 máy)`;
-
-  await transporter.sendMail({
-    from,
-    to: toEmail,
-    subject,
-    text,
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      from,
+      to: [toEmail],
+      subject,
+      html,
+    }),
   });
+
+  const text = await res.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+  if (!res.ok) {
+    // ném lỗi để route approve bắt và rollback
+    throw new Error(data?.message || data?.error || `Resend HTTP ${res.status}`);
+  }
+
+  return data;
 }
+
 function generateLicenseKey10() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
