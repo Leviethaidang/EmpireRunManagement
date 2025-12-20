@@ -16,20 +16,14 @@ function formatNumber(n) {
   return x.toLocaleString("vi-VN");
 }
 function formatDateTimeLocal(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return String(iso);
-
-  const pad = (x) => String(x).padStart(2, "0");
-  const hh = pad(d.getHours());
-  const mm = pad(d.getMinutes());
-  const ss = pad(d.getSeconds());
-  const dd = pad(d.getDate());
-  const MM = pad(d.getMonth() + 1);
-  const yyyy = d.getFullYear();
-
-  return ` ${hh}:${mm}:${ss} ${dd}/${MM}/${yyyy}`;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString();
+  } catch {
+    return String(iso);
+  }
 }
+
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
