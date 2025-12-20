@@ -895,6 +895,41 @@ app.post("/api/admin/ban/set-ban", async (req, res) => {
     return res.status(500).json({ success: false, error: "server_error" });
   }
 });
+//list license keys
+app.get("/api/admin/license-keys", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || "200", 10) || 200, 500);
+
+    const q = `
+      SELECT
+        id,
+        license_key,
+        email,
+        status,
+        created_at,
+        activated_at
+      FROM license_keys
+      ORDER BY id DESC
+      LIMIT $1;
+    `;
+
+    const result = await pool.query(q, [limit]);
+
+    const keys = (result.rows || []).map(r => ({
+      id: r.id,
+      key: r.license_key,
+      email: r.email,
+      isActivated: String(r.status || "").toLowerCase() === "activated",
+      createdAt: r.created_at,
+      activatedAt: r.activated_at,
+    }));
+
+    return res.json({ success: true, keys });
+  } catch (err) {
+    console.error("GET /api/admin/license-keys error:", err);
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
 
 // Approve order -> generate license key -> save DB -> send email
 app.post("/api/admin/orders/approve", async (req, res) => {
@@ -1265,35 +1300,6 @@ app.get("/api/admin/orders/test", async (req, res) => {
   } catch (err) {
     logDbError("orders/test", err);
     res.status(500).json({ success: false });
-  }
-});
-//test list license keys
-app.get("/api/admin/license-keys", async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit || "200", 10) || 200, 500);
-
-    const r = await pool.query(
-      `SELECT id, license_key, status, created_at, activated_at
-       FROM license_keys
-       ORDER BY id DESC
-       LIMIT $1;`,
-      [limit]
-    );
-
-    // trả thêm isActivated cho UI dễ dùng
-    const keys = r.rows.map(k => ({
-      id: k.id,
-      key: k.license_key,
-      status: k.status,              // 'unused' | 'activated'
-      isActivated: k.status === "activated",
-      createdAt: k.created_at,
-      activatedAt: k.activated_at,
-    }));
-
-    return res.json({ success: true, keys });
-  } catch (err) {
-    logDbError("admin/license-keys", err);
-    return res.status(500).json({ success: false, error: "server_error" });
   }
 });
 

@@ -1,4 +1,5 @@
 let __allOrders = [];
+let __allKeys = [];
 let __pollTimer = null;
 
 async function fetchJson(url, options) {
@@ -54,7 +55,10 @@ function renderKeyItem(container, k) {
   const isAct = !!k.isActivated;
   const label = isAct ? "Activated" : "Created";
   const t = (isAct ? k.activatedAt : k.createdAt) || (k.activatedAt || k.createdAt) || "";
-  time.textContent = t ? `${label}: ${formatDateTimeLocal(t)}` : "";
+  const email = (k.email || "").trim();
+  time.textContent = t
+    ? `${label}: ${formatDateTimeLocal(t)}${email ? ` for ${email}` : ""}`
+    : "";
 
   item.appendChild(line);
   item.appendChild(time);
@@ -157,7 +161,16 @@ async function loadAll() {
   const keysRes = await fetchJson("/api/admin/license-keys?limit=200");
   const keys = keysRes.keys || [];
 
-  for (const k of keys) renderKeyItem(keyList, k);
+  __allKeys = keys.map(k => ({
+    id: k.id,
+    key: k.key,
+    email: k.email,            // ✅ nhận email từ API
+    isActivated: !!k.isActivated,
+    createdAt: k.createdAt,
+    activatedAt: k.activatedAt,
+  }));
+
+  applyKeyFilter();
 
   // waiting orders
   const ordersRes = await fetchJson("/api/admin/orders?status=pending");
@@ -207,11 +220,35 @@ async function refreshWaitingOrders() {
     console.warn("Polling orders failed:", e.message);
   }
 }
+function applyKeyFilter() {
+  const q = String(document.getElementById("key-search")?.value || "")
+    .trim()
+    .toLowerCase();
+
+  const keyList = document.getElementById("key-list");
+  if (!keyList) return;
+
+  keyList.innerHTML = "";
+
+  const filtered = !q
+    ? __allKeys
+    : __allKeys.filter(k => {
+        const code = String(k.key || "").toLowerCase();
+        const email = String(k.email || "").toLowerCase();
+        return code.includes(q) || email.includes(q);
+      });
+
+  for (const k of filtered) renderKeyItem(keyList, k);
+}
 
 // setup search
 document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("order-search");
   if (input) input.addEventListener("input", applyOrderFilter);
+  
+  const keyInput = document.getElementById("key-search");
+  if (keyInput) keyInput.addEventListener("input", applyKeyFilter);
+
 
   if (__pollTimer) clearInterval(__pollTimer);
   __pollTimer = setInterval(refreshWaitingOrders, 5000);
