@@ -214,6 +214,44 @@ async function refreshWaitingOrders() {
     console.warn("Polling orders failed:", e.message);
   }
 }
+
+async function refreshKeys() {
+  try {
+    const keysRes = await fetchJson("/api/admin/license-keys?limit=200");
+
+    const newKeys = [...(keysRes.keys || [])].reverse().map(k => ({
+      id: k.id,
+      key: k.key,
+      email: k.email,
+      isActivated: !!k.isActivated,
+      createdAt: k.createdAt,
+      activatedAt: k.activatedAt,
+    }));
+
+    const oldSig = JSON.stringify(__allKeys.map(x => [x.id, x.isActivated, x.activatedAt, x.createdAt, x.email, x.key]));
+    const newSig = JSON.stringify(newKeys.map(x => [x.id, x.isActivated, x.activatedAt, x.createdAt, x.email, x.key]));
+    if (oldSig === newSig) return;
+
+    __allKeys = newKeys;
+
+    applyKeyFilter();
+
+    const activatedKeys = __allKeys.filter(k => k.isActivated).length;
+
+    const elKeys = document.getElementById("sum-keys");
+    if (elKeys) elKeys.textContent = formatNumber(__allKeys.length);
+
+    const elRevenue = document.getElementById("sum-revenue");
+    if (elRevenue) elRevenue.textContent = formatNumber(__allKeys.length * 50000);
+
+    const elActivated = document.getElementById("sum-activated");
+    if (elActivated) elActivated.textContent = formatNumber(activatedKeys);
+
+  } catch (e) {
+    console.warn("Polling keys failed:", e.message);
+  }
+}
+
 function applyKeyFilter() {
   const q = String(document.getElementById("key-search")?.value || "")
     .trim()
@@ -246,7 +284,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
   if (__pollTimer) clearInterval(__pollTimer);
-  __pollTimer = setInterval(refreshWaitingOrders, 5000);
+  __pollTimer = setInterval(() => {
+    refreshWaitingOrders();
+    refreshKeys();
+  }, 5000);
 });
 
 
