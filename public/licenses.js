@@ -153,12 +153,12 @@ async function loadAll() {
   keyList.innerHTML = "";
 
   const keysRes = await fetchJson("/api/admin/license-keys?limit=200");
-  const keys = keysRes.keys || [];
+  const keys = [...(keysRes.keys || [])].reverse();
 
   __allKeys = keys.map(k => ({
     id: k.id,
     key: k.key,
-    email: k.email,            // ✅ nhận email từ API
+    email: k.email,
     isActivated: !!k.isActivated,
     createdAt: k.createdAt,
     activatedAt: k.activatedAt,
@@ -233,6 +233,7 @@ function applyKeyFilter() {
       });
 
   for (const k of filtered) renderKeyItem(keyList, k);
+  keyList.scrollTop = keyList.scrollHeight;
 }
 
 // setup search
